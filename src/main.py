@@ -160,11 +160,11 @@ def main(page: ft.Page):
                                 on_change=lambda e: setattr(state, 'horizon', int(float(e.control.value))),
                             ),
                             ft.Dropdown(
-                                label="Model",
+                                label="Model Engine",
                                 value=state.model_choice,
                                 options=[
-                                    ft.dropdown.Option("sarima", "SARIMA (Stat)"),
-                                    ft.dropdown.Option("lgb", "LightGBM (ML)"),
+                                    ft.dropdown.Option("linear", "Standard Linear"),
+                                    ft.dropdown.Option("trend", "Polynomial Trend"),
                                 ],
                                 on_change=lambda e: setattr(state, 'model_choice', e.control.value),
                             ),
