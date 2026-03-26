@@ -1,21 +1,12 @@
 import asyncio
-import flet as ft
-import pandas as pd
-import os
 import io
 import base64
+
+import flet as ft
+import pandas as pd
 import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend, required for Android
 import matplotlib.pyplot as plt
-
-
-def fig_to_base64(fig) -> str:
-    """Converts a matplotlib figure to a base64-encoded PNG string for ft.Image."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("utf-8")
 
 from src.styles import (
     BG_COLOR, CARD_BG, PRIMARY_NEON, SUCCESS_NEON, ERROR_NEON,
@@ -24,6 +15,15 @@ from src.styles import (
 )
 from src.vision_engine import VisionEngine
 from src.forecast_engine import ForecastEngine
+
+
+def fig_to_base64(fig) -> str:
+    """Converts a matplotlib figure to a base64-encoded PNG for ft.Image — works on Android."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
 
 
 # ---------------------------------------------------------------------------
