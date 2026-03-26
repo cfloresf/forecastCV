@@ -36,8 +36,8 @@ jobs:
 
       - name: Build APK with Flet
         run: |
-          # Explicitly pass entry point so flet picks main.py (not src/main.py)
-          flet build apk main.py --verbose
+          # --module-name tells flet which .py file is the entry point
+          flet build apk --module-name main --verbose
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
