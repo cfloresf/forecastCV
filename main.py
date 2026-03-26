@@ -3,11 +3,19 @@ import flet as ft
 import pandas as pd
 import os
 import io
-import time
+import base64
 import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend, required for Android
 import matplotlib.pyplot as plt
-from flet.matplotlib_chart import MatplotlibChart
+
+
+def fig_to_base64(fig) -> str:
+    """Converts a matplotlib figure to a base64-encoded PNG string for ft.Image."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
 
 from src.styles import (
     BG_COLOR, CARD_BG, PRIMARY_NEON, SUCCESS_NEON, ERROR_NEON,
@@ -149,7 +157,11 @@ def main(page: ft.Page):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         plt.tight_layout()
-        chart_ctrl = MatplotlibChart(fig, expand=True)
+        chart_ctrl = ft.Image(
+            src_base64=fig_to_base64(fig),
+            fit=ft.ImageFit.CONTAIN,
+            expand=True,
+        )
 
         return ft.View(
             "/review",
@@ -264,7 +276,11 @@ def main(page: ft.Page):
             for spine in ["bottom", "left"]:
                 ax.spines[spine].set_color(TEXT_SECONDARY)
             plt.tight_layout()
-            return MatplotlibChart(fig)
+            return ft.Image(
+                src_base64=fig_to_base64(fig),
+                fit=ft.ImageFit.CONTAIN,
+                expand=True,
+            )
 
         page.run_task(run_ml)
 
