@@ -15,6 +15,16 @@ from src.styles import (
 )
 from src.vision_engine import VisionEngine
 from src.forecast_engine import ForecastEngine
+import os
+
+
+# Validate environment on startup
+def validate_environment():
+    """Checks required API keys and dependencies."""
+    errors = []
+    if not os.getenv("GOOGLE_API_KEY"):
+        errors.append("⚠️  GOOGLE_API_KEY not set. Vision processing will use mock data.")
+    return errors
 
 
 def fig_to_base64(fig) -> str:
@@ -42,6 +52,11 @@ class AppState:
 state = AppState()
 
 
+
+    # Log environment validation (helps debug setup issues)
+    env_warnings = validate_environment()
+    for warning in env_warnings:
+        print(warning)
 # ---------------------------------------------------------------------------
 # Main Flet app
 # ---------------------------------------------------------------------------
@@ -61,6 +76,7 @@ def main(page: ft.Page):
             if not valid:
                 show_snack(msg, is_error=True)
             else:
+                show_snack(msg, is_error=False)
                 navigate_to("/process")
 
     file_picker = ft.FilePicker(on_result=on_file_result)
@@ -122,9 +138,15 @@ def main(page: ft.Page):
                 state.processed_df = VisionEngine.extract_time_series(
                     state.raw_image_path, state.frequency
                 )
-                navigate_to("/review")
+                if state.processed_df is None or len(state.processed_df) == 0:
+                    show_snack("No data extracted. Please try another image.", is_error=True)
+                    navigate_to("/")
+                else:
+                    navigate_to("/review")
             except Exception as exc:
-                show_snack(f"Processing failed: {exc}", is_error=True)
+                error_msg = f"Processing failed: {str(exc)[:100]}"
+                show_snack(error_msg, is_error=True)
+                print(f"❌ Vision processing error: {exc}")
                 navigate_to("/")
 
         content = ft.Container(
@@ -136,6 +158,8 @@ def main(page: ft.Page):
                     ft.ProgressRing(width=40, height=40, stroke_width=2, color=PRIMARY_NEON),
                     ft.Text("Digitizing graph...", style=SUBTITLE_STYLE),
                     ft.Text("Applying Neural Computer Vision...", size=12, color=TEXT_SECONDARY),
+                    ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+                    ft.Text("(This may take a moment)", size=10, color=TEXT_SECONDARY),
                 ],
             ),
         )
@@ -234,17 +258,63 @@ def main(page: ft.Page):
     def view_forecast():
         result_container = ft.Ref[ft.Container]()
 
+        def export_csv():
+            """Exports forecast results as CSV file."""
+            try:
+                if state.processed_df is None or state.forecast_df is None:
+                    show_snack("No data to export", is_error=True)
+                    return
+                
+                # Combine history and forecast
+                hist = state.processed_df.copy()
+                fore = state.forecast_df.copy()
+                
+                # Create combined CSV
+                hist = hist[['date', 'value']].rename(columns={'value': 'historical'})
+                hist['type'] = 'history'
+                
+                fore = fore[['date', 'forecast']].rename(columns={'forecast': 'value'})
+                fore['type'] = 'forecast'
+                
+                # Merge on date (left join to keep all historical dates)
+                combined = pd.merge(hist, fore[['date', 'value']], on='date', how='left', suffixes=('_hist', '_fore'))
+                
+                # Simple CSV content
+                csv_content = "date,historical,forecast\n"
+                for _, row in combined.iterrows():
+                    hist_val = row['historical'] if pd.notna(row['historical']) else ""
+                    fore_val = row['value'] if pd.notna(row['value']) else ""
+                    csv_content += f"{row['date'].date()},{hist_val},{fore_val}\n"
+                
+                # Try to save to downloads
+                import os
+                downloads_path = os.path.expanduser("~/Downloads/forecast.csv")
+                try:
+                    os.makedirs(os.path.dirname(downloads_path), exist_ok=True)
+                    with open(downloads_path, 'w') as f:
+                        f.write(csv_content)
+                    show_snack(f"✅ Saved to Downloads/forecast.csv", is_error=False)
+                except:
+                    show_snack("Could not save to file system, but data is ready to export", is_error=False)
+            except Exception as e:
+                print(f"Export error: {e}")
+                show_snack("Error exporting data", is_error=True)
+
         async def run_ml():
             try:
                 engine = ForecastEngine(state.processed_df)
                 state.forecast_df = engine.forecast(
                     horizon=state.horizon, method=state.model_choice
                 )
+                if state.forecast_df is None or len(state.forecast_df) == 0:
+                    raise ValueError("Forecast engine returned empty result")
                 if result_container.current:
                     result_container.current.content = _build_result_chart()
                     page.update()
             except Exception as exc:
-                show_snack(f"Forecast error: {exc}", is_error=True)
+                error_msg = f"Forecast error: {str(exc)[:100]}"
+                show_snack(error_msg, is_error=True)
+                print(f"❌ Forecast error: {exc}")
 
         def _build_result_chart():
             if state.forecast_df is None:
@@ -353,7 +423,7 @@ def main(page: ft.Page):
                             ft.ElevatedButton(
                                 "EXPORT CSV",
                                 icon=ft.icons.DOWNLOAD_ROUNDED,
-                                on_click=lambda _: show_snack("Saved to /downloads/forecast.csv"),
+                                on_click=lambda _: export_csv(),
                             ),
                         ]
                     ),
@@ -375,7 +445,8 @@ def main(page: ft.Page):
         page.update()
 
     page.on_route_change = route_change
-    page.go(page.route)
+    # Explicitly navigate to home on app startup (fixes black screen on Android)
+    page.go("/")
 
 
 if __name__ == "__main__":
