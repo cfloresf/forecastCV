@@ -1,0 +1,18 @@
+[project]
+name = "forecastCV"
+version = "0.1.0"
+description = "AI-powered time series forecasting from chart images"
+requires-python = ">=3.10"
+dependencies = [
+    "flet==0.25.0",
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "Pillow",
+    "google-generativeai",
+    "python-dateutil",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
